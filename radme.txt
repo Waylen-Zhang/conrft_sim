@@ -1,0 +1,6 @@
+Run:
+export LD_LIBRARY_PATH=$CONDA_PREFIX/lib/python3.10/site-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$CONDA_PREFIX/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
+export HF_ENDPOINT=https://huggingface.co
+export LD_LIBRARY_PATH=/home/dx/miniconda3/envs/conrft/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:/home/dx/miniconda3/envs/conrft/lib/python3.10/site-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
+bash run_actor_conrft.sh --eval_checkpoint_step=30000 and --eval_n_trajs=100 --checkpoint_path=first_run
