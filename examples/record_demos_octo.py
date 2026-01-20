@@ -16,7 +16,7 @@ from octo.model.octo_model import OctoModel
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "exp_name", None, "Name of experiment corresponding to folder.")
+    "exp_name", "pick_cube_sim", "Name of experiment corresponding to folder.")
 flags.DEFINE_integer("successes_needed", 20,
                      "Number of successful demos to collect.")
 flags.DEFINE_float("reward_scale", 1.0, "reward_scale ")
@@ -31,6 +31,7 @@ def main(_):
 
     model = OctoModel.load_pretrained(config.octo_path)
     tasks = model.create_tasks(texts=[config.task_desc])
+    
     # model = None
     # tasks = None
 

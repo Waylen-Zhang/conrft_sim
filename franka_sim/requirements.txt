@@ -1,7 +1,11 @@
 dm_env
 mujoco==2.3.7
 # gym >= 0.26
-# gymnasium
+gymnasium==0.29.1
 dm-robotics-transformations
 imageio[ffmpeg]
 lxml
+numpy<2
+pyrealsense2
+pyquaternion
+easyhid

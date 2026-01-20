@@ -103,6 +103,7 @@ pynput
 Then install the remaining dependencies:
 
 ```bash
+conda install -c conda-forge pynput
 pip install -r requirements.txt
 cd ..
 ```

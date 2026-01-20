@@ -1,6 +1,6 @@
 gym >= 0.26
 numpy>=1.24.3
-flax>=0.8.0
+flax==0.8.0
 distrax>=0.1.2
 ml_collections >= 0.1.0
 tqdm >= 4.60.0
