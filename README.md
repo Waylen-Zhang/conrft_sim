@@ -3,88 +3,138 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Static Badge](https://img.shields.io/badge/Project-Page-a)](https://cccedric.github.io/conrft/)
 
-We provide examples to fine-tune Octo, on the top of [HIL-SERL](https://github.com/rail-berkeley/hil-serl) that provides the base environment to perform robotic manipulation tasks with human interventions. The following sections describe how to use our code. 
+We provide examples to fine-tune Octo on top of HIL-SERL for robotic manipulation with human interventions.
 
+## 🛠️ Installation Instructions (Updated & Verified)
 
-**Table of Contents**
-- [ConRFT: A Reinforced Fine-tuning Method for VLA Models via Consistency Policy](#conrft-a-reinforced-fine-tuning-method-for-vla-models-via-consistency-policy)
-  - [🛠️ Installation Instructions](#️-installation-instructions)
-  - [💻 Overview and Code Structure](#-overview-and-code-structure)
-  - [✉️ Contact](#️-contact)
-  - [🙏 Acknowledgement](#-acknowledgement)
-  - [📝 Citation](#-citation)
+> The original installation process is no longer reliable due to severe version conflicts between CUDA, JAX, NumPy, Octo and serl\_launcher. The following workflow has been fully verified on a clean system. Please follow it exactly.
 
-## 🛠️ Installation Instructions
-1. **Setup Conda Environment:**
-    create an environment with
-    ```bash
-    conda create -n conrft python=3.10
-    ```
+### 1. Environment and CUDA
 
-2. **Install Jax as follows:**
-    - For CPU (not recommended):
-        ```bash
-        pip install --upgrade "jax[cpu]"
-        ```
+```bash
+conda create -n flexiv_conrft python=3.10
+conda activate flexiv_conrft
+conda install -c "nvidia/label/cuda-12.1.0" cuda
+```
 
-    - For GPU:
-        ```bash
-        pip install --upgrade "jax[cuda11_pip]==0.4.20" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-        ```
-    - See the [Jax Github page](https://github.com/google/jax) for more details on installing Jax.
+### 2. PyTorch and JAX (GPU)
 
-3. **Install the Octo**
-    ```bash
-    git clone git@github.com:cccedric/octo.git
-    cd octo
-    pip install -e .
-    pip install -r requirements.txt
-    ```
-    **Note**: This is a personalized fork of Octo, adding custom functions while preserving its core capabilities for general-purpose robotic manipulation.
+```bash
+pip install torch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 \
+  --index-url https://download.pytorch.org/whl/cu121 \
+  -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-4. **Install the serl_launcher**
-    ```bash
-    cd serl_launcher
-    pip install -e .
-    pip install -r requirements.txt
-    ```
+pip install jax==0.4.26 jaxlib==0.4.26+cuda12.cudnn89 \
+  -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+```
 
-5. **Install for serl_robot_infra** 
-   
-   Please refer to the [README](./serl_robot_infra/README.md) in the `serl_robot_infra` directory for installation instructions and details on operating the Franka robot arm. This document includes guidance on setting up the impedance-based [serl_franka_controllers](https://github.com/rail-berkeley/serl_franka_controllers). After completing the installation, you should be able to start the robot server and interact with the `franka_env` gym for hardware control.
+Configure runtime libraries (modify the Conda path if needed):
 
+```bash
+export LD_LIBRARY_PATH=/home/dx/miniconda3/envs/flexiv_conrft/lib/python3.10/site-packages/nvidia/cuda_runtime/lib:/home/dx/miniconda3/envs/flexiv_conrft/lib/python3.10/site-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
+```
 
-## 💻 Overview and Code Structure
+Verify:
 
-We offers a set of code for fine-tuning Octo in robotic manipulation tasks. The approach's pipeline consists of an actor thread and a learner thread, both of which interact with the robot gym environment. These two threads operate asynchronously, with data transmitted from the actor to the learner node over the network using [agentlace](https://github.com/youliangtan/agentlace). The learner thread periodically updates the policy and syncs it with the actor. 
+```bash
+python - << 'EOF'
+import jax
+print(jax.devices())
+import torch
+print(torch.cuda.is_available())
+EOF
+```
 
-**Table for code structure**
+### 3. Clone ConRFT
 
-| Code Directory | Description |
-| --- | --- |
-| examples | Scripts for policy training, demonstration data collection, reward classifier training |
-| serl_launcher | Main code for Agent Training |
-| serl_launcher.agents | Agent Policies (e.g. SAC, BC) |
-| serl_launcher.wrappers | Gym env wrappers |
-| serl_launcher.data | Replay buffer and data store |
-| serl_launcher.vision | Vision related models and utils |
-| serl_robot_infra | Robot infra for running with real robots |
-| serl_robot_infra.robot_servers | Flask server for sending commands to robot via ROS |
-| serl_robot_infra.franka_env | Gym env for Franka robot |
+```bash
+git clone https://github.com/cccedric/conrft.git
+cd conrft
+```
 
-We provide a step-by-step guide in [franka_walkthrough](/docs/franka_walkthrough.md) to fine-tune VLA with ConRFT on a Franka robot.
+### 4. Install Octo (patched)
 
-## ✉️ Contact
-For any questions, please feel free to email [chenyuhui2022@ia.ac.cn](mailto:chenyuhui2022@ia.ac.cn).
+```bash
+git clone git@github.com:cccedric/octo.git
+cd octo
+pip install -e .
+```
 
-## 🙏 Acknowledgement
-Our code is built upon [CPQL](https://github.com/cccedric/cpql/), [Octo](https://github.com/octo-models/octo), [HIL-SERL](https://github.com/rail-berkeley/hil-serl). We thank all these authors for their nicely open sourced code and their great contributions to the community.
+Edit `octo/requirements.txt` and **remove or comment out**:
 
-## 📝 Citation
+```text
+jax == 0.4.20
+```
 
-If you find our research helpful and would like to reference it in your work, please consider using one of the following citations, depending on the format that best suits your needs:
+Then install the remaining dependencies:
 
-For the Arxiv version:
+```bash
+pip install -r requirements.txt
+```
+
+### 5. Install serl\_launcher (patched)
+
+```bash
+cd serl_launcher
+```
+
+Edit `setup.py` and remove:
+
+```text
+opencv_python
+```
+
+Install the package and OpenCV manually:
+
+```bash
+pip install -e .
+pip install "opencv-python<=4.9.0.80"
+```
+
+Edit `serl_launcher/requirements.txt` and remove or comment out:
+
+```text
+numpy
+flax
+tensorflow
+pynput
+```
+
+Then install the remaining dependencies:
+
+```bash
+pip install -r requirements.txt
+cd ..
+```
+
+### 6. Download Octo model weights
+
+```bash
+export HF_ENDPOINT=https://huggingface.co
+huggingface-cli download octo-models/octo-base-1.5 --local-dir ./octo-base-1.5
+mv octo-base-1.5 octo_model
+```
+
+### 7. Final checklist
+
+* `jax.devices()` shows CUDA devices
+* `torch.cuda.is_available()` returns `True`
+* Octo is installed without forcing old JAX
+* serl\_launcher installs without OpenCV / NumPy conflicts
+* `octo_model/` directory exists
+
+You can now proceed with training or robot deployment.
+
+### Real robot setup
+
+For Franka robot and impedance controller configuration, see `./serl_robot_infra/README.md`.
+
+## Contact
+
+[chenyuhui2022@ia.ac.cn](mailto:chenyuhui2022@ia.ac.cn)
+
+## Citation
+
 ```bibtex
 @article{chen2025conrft,
   title={ConRFT: A Reinforced Fine-tuning Method for VLA Models via Consistency Policy},
@@ -93,13 +143,11 @@ For the Arxiv version:
   year={2025}
 }
 ```
-Or, for citing our work presented at the conference of RSS 2025:
-```bibtex
-@inproceedings{chen2025conrft, 
-    title={ConRFT: A Reinforced Fine-tuning Method for VLA Models via Consistency Policy}, 
-    author={Yuhui Chen and Shuai Tian and Shugao Liu and Yingting Zhou and Haoran Li and Dongbin Zhao}, 
-    booktitle={Proceedings of Robotics: Science and Systems, {RSS} 2025, Los Angeles, CA, USA, Jun 21-25, 2025}, 
-    doi={10.15607/RSS.2025.XXI.019
-} 
-```
 
+```bibtex
+@inproceedings{chen2025conrft,
+  title={ConRFT: A Reinforced Fine-tuning Method for VLA Models via Consistency Policy},
+  author={Yuhui Chen and Shuai Tian and Shugao Liu and Yingting Zhou and Haoran Li and Dongbin Zhao},
+  booktitle={Proceedings of Robotics: Science and Systems (RSS) 2025}
+}
+```
