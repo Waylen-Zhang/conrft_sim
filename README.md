@@ -1,4 +1,4 @@
-# ConRFT: A Reinforced Fine-tuning Method for VLA Models via Consistency Policy
+# ConRFT-sim: Add mujoco simulation to ConRFT
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Static Badge](https://img.shields.io/badge/Project-Page-a)](https://cccedric.github.io/conrft/)
@@ -115,7 +115,15 @@ huggingface-cli download octo-models/octo-base-1.5 --local-dir ./octo-base-1.5
 mv octo-base-1.5 octo_model
 ```
 
-### 7. Final checklist
+### 7. Install franka_sim
+
+```bash
+cd franka_sim
+pip install -e .
+pip install -r requirements.txt & cd ..
+```
+
+### 8. Final checklist
 
 * `jax.devices()` shows CUDA devices
 * `torch.cuda.is_available()` returns `True`
