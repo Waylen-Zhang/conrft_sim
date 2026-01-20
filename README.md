@@ -124,7 +124,7 @@ pip install -e .
 pip install -r requirements.txt & cd ..
 ```
 
-if you use nvidia 5090 and find error "**ptxas too old**", then try "    pip install nvidia-cuda-nvcc-cu12==12.9.86    "
+if you use nvidia 5090 and meet error "**ptxas too old**", then try  " pip install nvidia-cuda-nvcc-cu12==12.9.86 "
 
 ### 8. Final checklist
 
