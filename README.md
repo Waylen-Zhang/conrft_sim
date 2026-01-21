@@ -180,6 +180,8 @@ Example configuration:
 bash run_actor_octo.sh --eval_checkpoint_step=30000 --eval_n_trajs=100 --checkpoint_path=first_run
 ```
 
+hint: if you have flexiv robot, you can follow instructions in: https://github.com/Waylen-Zhang/flexiv_interface. Then you can use flexiv_assembly environment same way as pick_cube_sim.
+
 ## Citation
 
 ```bibtex
@@ -198,5 +200,7 @@ bash run_actor_octo.sh --eval_checkpoint_step=30000 --eval_n_trajs=100 --checkpo
   booktitle={Proceedings of Robotics: Science and Syste
 ```
 
+
+```
 
 ```
