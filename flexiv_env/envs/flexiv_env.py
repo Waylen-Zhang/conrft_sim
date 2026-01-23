@@ -12,6 +12,7 @@ import threading
 from datetime import datetime
 from collections import OrderedDict
 from typing import Dict
+from scipy.spatial.transform import Rotation,Slerp
 
 from franka_env.camera.video_capture import VideoCapture
 from franka_env.camera.rs_capture import RSCapture
@@ -80,7 +81,7 @@ class DefaultEnvConfig:
 class FlexivEnv(gym.Env):
     def __init__(
         self,
-        hz=20,
+        hz=10,
         fake_env=False,
         save_video=False,
         config: DefaultEnvConfig = None,
@@ -190,29 +191,114 @@ class FlexivEnv(gym.Env):
 
         print("Initialized Flexiv Env")
 
+    # def clip_safety_box(self, pose: np.ndarray) -> np.ndarray:
+    #     """Clip the pose to be within the safety box."""
+    #     pose_clipped = pose.copy()
+    #     pose_clipped[:3] = np.clip(
+    #         pose_clipped[:3], self.xyz_bounding_box.low, self.xyz_bounding_box.high
+    #     )
+    #     euler = Rotation.from_quat(pose_clipped[3:]).as_euler("xyz")
+    #     print(euler)
+
+
+    #     sign = np.sign(euler[0])
+    #     euler[0] = sign * (
+    #         np.clip(
+    #             np.abs(euler[0]),
+    #             self.rpy_bounding_box.low[0],
+    #             self.rpy_bounding_box.high[0],
+    #         )
+    #     )
+
+    #     euler[1:] = np.clip(
+    #         euler[1:], self.rpy_bounding_box.low[1:], self.rpy_bounding_box.high[1:]
+    #     )
+    #     pose_clipped[3:] = Rotation.from_euler("xyz", euler).as_quat()
+
+    #     return pose_clipped
+
     def clip_safety_box(self, pose: np.ndarray) -> np.ndarray:
-        """Clip the pose to be within the safety box."""
+        """
+        基于配置的上下限进行安全截断。
+        包含：
+        1. 异常距离检测：如果输入姿态距离目标太远，视为异常，不进行处理。
+        2. 智能欧拉角截断：自动处理 +/- 2pi 周期问题，解决乱晃。
+        """
+        # -----------------------------------------------------------
+        # 0. 提取配置 (假设这些已经在 __init__ 或类属性中定义好)
+        # -----------------------------------------------------------
+        # 你的目标姿态 (x, y, z, r, p, y)
+         
+        # 你的上下限 (6D)
+        target_pose_6d = np.array([0.60539,0.3526,0.28206 ,-np.pi, 0, np.pi])
+        
+        # 阈值：如果偏离超过这个值，说明数据异常，放弃修正直接返回
+        # 距离阈值 (米) 和 角度阈值 (弧度, 约45度)
+        SAFE_DIST_THRESHOLD = 0.3
+        SAFE_ANGLE_THRESHOLD = 1 
+
+        # -----------------------------------------------------------
+        # 1. 解析输入姿态 (XYZ + Quaternion)
+        # -----------------------------------------------------------
+        current_pos = pose[:3]
+        current_quat = pose[3:]
+        
+        # 将四元数转为欧拉角 (必须与你 TARGET_POSE 的旋转顺序一致，这里假设是 'xyz')
+        r_current = Rotation.from_quat(current_quat)
+        current_euler = r_current.as_euler('xyz')
+
+        # -----------------------------------------------------------
+        # 2. 安全检测：与 Target 的距离判断 (新增需求)
+        # -----------------------------------------------------------
+        target_pos = target_pose_6d[:3]
+        target_euler = target_pose_6d[3:]
+
+        # 2.1 位置距离
+        pos_diff = np.linalg.norm(current_pos - target_pos)
+
+        # 2.2 角度距离 (处理周期性，计算最小旋转差)
+        # 简单计算：四元数夹角
+        r_target = Rotation.from_euler('xyz', target_euler)
+        # q_diff = q1 * q2_inv
+        q_diff = r_current * r_target.inv()
+        # 旋转角度 = 2 * atan2(norm(vec), w) -> 也就是旋转向量的模长
+        angle_diff = q_diff.magnitude() 
+
+        # 如果偏差过大，说明可能是奇异点、IK解算错误或传感器故障
+        # 此时强制修正可能会导致剧烈动作，因此按你要求返回原姿态
+        if pos_diff > SAFE_DIST_THRESHOLD or angle_diff > SAFE_ANGLE_THRESHOLD:
+            # print(f"current euler{current_euler},target euler{target_euler}")
+            print(f"[Warning] Pose deviation too large! Pos: {pos_diff:.3f}, Ang: {angle_diff:.3f}. Skipping clip.")
+            return pose.copy()
+
+        # -----------------------------------------------------------
+        # 3. 执行截断 (Clip)
+        # -----------------------------------------------------------
         pose_clipped = pose.copy()
+
+        # 3.1 位置截断 (线性，直接截断)
         pose_clipped[:3] = np.clip(
-            pose_clipped[:3], self.xyz_bounding_box.low, self.xyz_bounding_box.high
+            current_pos, self.xyz_bounding_box.low, self.xyz_bounding_box.high
         )
-        euler = Rotation.from_quat(pose_clipped[3:]).as_euler("xyz")
+        
+        diff = current_euler - target_euler
+        diff = (diff + np.pi) % (2 * np.pi) - np.pi
+        current_euler_aligned = target_euler + diff
 
-        sign = np.sign(euler[0])
-        euler[0] = sign * (
-            np.clip(
-                np.abs(euler[0]),
-                self.rpy_bounding_box.low[0],
-                self.rpy_bounding_box.high[0],
-            )
+        euler_clipped = np.clip(
+            current_euler_aligned, self.rpy_bounding_box.low, self.rpy_bounding_box.high
         )
 
-        euler[1:] = np.clip(
-            euler[1:], self.rpy_bounding_box.low[1:], self.rpy_bounding_box.high[1:]
-        )
-        pose_clipped[3:] = Rotation.from_euler("xyz", euler).as_quat()
+        r_clipped = Rotation.from_euler('xyz', euler_clipped)
+        pose_clipped[3:] = r_clipped.as_quat()
+
+        # 4.1 防止四元数正负翻转 (Double Cover)
+        # 确保输出的四元数与输入的四元数在同一个半球面上
+        if np.dot(pose[3:], pose_clipped[3:]) < 0:
+            pose_clipped[3:] = -pose_clipped[3:]
 
         return pose_clipped
+    
 
     def go_to_reset(self, joint_reset=False):
         self.robot.open_gripper()
@@ -233,7 +319,7 @@ class FlexivEnv(gym.Env):
         
         self._update_currpos()
         self.robot.start_joint_impedance_control()
-        self.robot.set_impedance(K=0.25)
+        # self.robot.set_impedance(K=0.25)
         
 
     def step(self, action: np.ndarray) -> tuple:
@@ -249,7 +335,7 @@ class FlexivEnv(gym.Env):
         rot_virtual = Rotation.from_quat(self.virtual_tcp_pose[3:])
         self.virtual_tcp_pose[3:] = (rot_action * rot_virtual).as_quat()
 
-        # self.virtual_tcp_pose = self.clip_safety_box(self.virtual_tcp_pose)
+        self.virtual_tcp_pose = self.clip_safety_box(self.virtual_tcp_pose)
         self._send_pos_command(self.virtual_tcp_pose)
 
         gripper_action = action[6] * self.action_scale[2]
@@ -334,7 +420,7 @@ class FlexivEnv(gym.Env):
         obs = self._get_obs()
         self.terminate = False
         
-        time.sleep(10)
+        time.sleep(6)
         print("recording start!!!!!!!!!!!!!!!!!")
         return obs, {"succeed": False}
     
@@ -398,12 +484,13 @@ class FlexivEnv(gym.Env):
         self.lastsentpos = pos
 
     def _send_gripper_command(self, pos: float, mode="binary"):
+        # print(pos)
         if mode == "binary":
-            if pos <= -0.5:
+            if pos <= -0.25:
                 self.robot.close_gripper()
                 self.last_gripper_act = time.time()
                 time.sleep(self.gripper_sleep)
-            elif pos >= 0.5:
+            elif pos >= 0.25:
                 self.robot.open_gripper()
                 self.last_gripper_act = time.time()
                 time.sleep(self.gripper_sleep)
@@ -440,6 +527,7 @@ class FlexivEnv(gym.Env):
         Get current observation.
         """
         images = self.get_im()
+        # print(**state_observation)
         state_observation = {
             "tcp_pose": self.currpos, # 现在这里是纯净的虚拟目标
             "tcp_vel": self.currvel,  # 真实速度

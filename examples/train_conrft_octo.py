@@ -473,7 +473,7 @@ def learner(rng, tasks, agent, replay_buffer, demo_buffer, wandb_logger=None):
             batch = frozen_dict.freeze(batch)
 
             with timer.context("train_critics"):
-                agent, critics_info = agent.update_ql(
+                agent, critics_info = agent.update_calql(
                     batch, networks_to_update=train_critic_networks_to_update,)
 
         with timer.context("train"):
@@ -485,7 +485,7 @@ def learner(rng, tasks, agent, replay_buffer, demo_buffer, wandb_logger=None):
                 "tasks": create_batch_tasks(tasks, config.batch_size),
             }
             batch = frozen_dict.freeze(batch)
-            agent, update_info = agent.update_ql(
+            agent, update_info = agent.update_calql(
                 batch, networks_to_update=train_networks_to_update,)
         # publish the updated network
         if step > 0 and step % (config.steps_per_update) == 0:

@@ -158,7 +158,7 @@ Example: collect 20 successful trajectories. Data will be saved to `examples/exp
 python ../../record_demos_octo.py --exp_name pick_cube_sim --successes_needed 20
 ```
 
-### 4. Start human-in-the-loop RL training
+### 3. Start human-in-the-loop RL training
 
 Before running, edit `run_actor.sh` and `run_learner.sh`:
 
@@ -172,7 +172,7 @@ bash run_actor_octo.sh --checkpoint_path first_run
 bash run_learner_octo.sh
 ```
 
-### 5. Evaluate the trained policy
+### 4. Evaluate the trained policy
 
 Example configuration:
 

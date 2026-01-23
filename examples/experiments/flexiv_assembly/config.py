@@ -26,25 +26,25 @@ class EnvConfig(DefaultEnvConfig):
             "dim": (640, 480),
         },
         "wrist_2": {
-            "serial_number": "218622271979",
+            "serial_number": "409122272714",
             "dim": (640,480),
         },
     }
     IMAGE_CROP = {
-        "wrist_1": lambda img: img[150:450, 350:1100],
-        "wrist_2": lambda img: img[100:500, 400:900],
+        "wrist_1": lambda img: img[:, :],
+        "wrist_2": lambda img: img[:, :],
     }
-    TARGET_POSE = np.array([0.6043,0.35283,0.28641 ,0, np.pi, 0])
-    GRASP_POSE = np.array([0.6043,0.35283,0.28641 ,0, np.pi, 0])
+    TARGET_POSE = np.array([0.60539,0.3526,0.28206 ,-np.pi, 0, np.pi])
+    GRASP_POSE = np.array([0.60539,0.3526,0.28206 ,-np.pi, 0, np.pi])
     RESET_POSE = TARGET_POSE + np.array([0, 0, 0.05, 0, 0.05, 0])
-    ABS_POSE_LIMIT_LOW = TARGET_POSE - np.array([0.03, 0.02, 0.01, 0.01, 0.1, 0.4])
-    ABS_POSE_LIMIT_HIGH = TARGET_POSE + np.array([0.03, 0.02, 0.05, 0.01, 0.1, 0.4])
+    ABS_POSE_LIMIT_LOW = TARGET_POSE - np.array([0.0, 0.1, 0.08, 0.02, 0.02, 0.2])
+    ABS_POSE_LIMIT_HIGH = TARGET_POSE + np.array([0.17, 0.1, 0.0, 0.02, 0.02, 0.2])
     RANDOM_RESET = True
     RANDOM_XY_RANGE = 0.02
     RANDOM_RZ_RANGE = 0.05
     ACTION_SCALE = (0.02, 0.04, 1)
     DISPLAY_IMAGE = True
-    MAX_EPISODE_LENGTH = 300
+    MAX_EPISODE_LENGTH = 100
     COMPLIANCE_PARAM = {
         "translational_stiffness": 2000,
         "translational_damping": 89,
@@ -123,7 +123,7 @@ class TrainConfig(DefaultTrainingConfig):
 
             def reward_func(obs):
                 sigmoid = lambda x: 1 / (1 + jnp.exp(-x))
-                pred_condition = sigmoid(classifier(obs)) > 0.85
+                pred_condition = sigmoid(classifier(obs)) > 0.5
                 state_condition = obs['state'][0, 6] > 0.04
                 result = (pred_condition & state_condition).astype(int)
                 return int(result.item()) 
