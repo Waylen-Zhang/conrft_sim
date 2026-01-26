@@ -308,59 +308,116 @@ class ConrftCPOctoAgentSingleArm(flax.struct.PyTreeNode):
 
         return critic_loss, info
 
+    # def policy_loss_fn(self, batch, params: Params, rng: PRNGKey):
+    #     batch_size = batch["rewards"].shape[0]
+    #     # Consistency loss
+    #     rng, noise_rng, indice_rng, policy_rng1, policy_rng2, policy_rng3, critic_rng = jax.random.split(
+    #         rng, 7)
+
+    #     new_actions, action_embeddings = self.forward_policy(
+    #         batch["tasks"], batch["observations"], batch["embeddings"], rng=policy_rng1, grad_params=params)
+
+    #     actions = batch["actions"][..., :-
+    #                                1] if self.config["fix_gripper"] else batch["actions"]
+    #     x_start = actions
+    #     noise = jax.random.normal(
+    #         noise_rng, shape=x_start.shape, dtype=x_start.dtype)
+    #     dims = x_start.ndim
+
+    #     indices = jax.random.randint(
+    #         indice_rng, (batch_size,), 0, self.config["num_scales"]-1)
+
+    #     t = self.config["sigma_max"] ** (1 / self.config["rho"]) + indices / (self.config["num_scales"] - 1) * (
+    #         self.config["sigma_min"] ** (1 / self.config["rho"]) -
+    #         self.config["sigma_max"] ** (1 / self.config["rho"])
+    #     )
+    #     t = t**self.config["rho"]
+
+    #     x_t = x_start + noise * append_dims(t, dims)
+
+    #     distiller, _ = self.forward_policy(
+    #         batch["tasks"], batch["observations"], batch["embeddings"], x_t, t, rng=policy_rng2, grad_params=params)
+
+    #     snrs = get_snr(t)
+    #     weights = get_weightings("karras", snrs, self.config["sigma_data"])
+
+    #     recon_diffs = (distiller - x_start) ** 2
+    #     recon_loss = (mean_flat(recon_diffs) * weights).mean()
+
+    #     mse = ((new_actions - actions) ** 2).sum(-1)
+    #     q_new_actions = self.forward_critic(
+    #         batch["observations"], batch["embeddings"], new_actions, rng=critic_rng,)
+    #     q_new_actions = q_new_actions.mean(axis=0)
+    #     chex.assert_shape(q_new_actions, (batch_size,))
+
+    #     q_loss = - q_new_actions.mean()
+    #     mse_loss = mse.mean()
+
+    #     actor_loss = self.state.bc_weight * recon_loss + self.state.q_weight * q_loss + self.state.bc_weight * mse_loss
+
+    #     info = {
+    #         "actor_loss": actor_loss,
+    #         "q_weight": self.state.q_weight,
+    #         "bc_weight": self.state.bc_weight,
+    #         "q_loss": q_new_actions.mean(),
+    #         "bc_loss": recon_loss,
+    #         "mse": mse.mean(),
+    #     }
+
+    #     return actor_loss, info
+
     def policy_loss_fn(self, batch, params: Params, rng: PRNGKey):
         batch_size = batch["rewards"].shape[0]
-        # Consistency loss
+        split_idx = batch_size // 2 
         rng, noise_rng, indice_rng, policy_rng1, policy_rng2, policy_rng3, critic_rng = jax.random.split(
             rng, 7)
-
         new_actions, action_embeddings = self.forward_policy(
             batch["tasks"], batch["observations"], batch["embeddings"], rng=policy_rng1, grad_params=params)
 
-        actions = batch["actions"][..., :-
-                                   1] if self.config["fix_gripper"] else batch["actions"]
+        actions = batch["actions"][..., :-1] if self.config["fix_gripper"] else batch["actions"]
         x_start = actions
-        noise = jax.random.normal(
-            noise_rng, shape=x_start.shape, dtype=x_start.dtype)
+        noise = jax.random.normal(noise_rng, shape=x_start.shape, dtype=x_start.dtype)
         dims = x_start.ndim
-
-        indices = jax.random.randint(
-            indice_rng, (batch_size,), 0, self.config["num_scales"]-1)
-
+        indices = jax.random.randint(indice_rng, (batch_size,), 0, self.config["num_scales"]-1)
         t = self.config["sigma_max"] ** (1 / self.config["rho"]) + indices / (self.config["num_scales"] - 1) * (
             self.config["sigma_min"] ** (1 / self.config["rho"]) -
             self.config["sigma_max"] ** (1 / self.config["rho"])
-        )
+            )
         t = t**self.config["rho"]
-
         x_t = x_start + noise * append_dims(t, dims)
-
         distiller, _ = self.forward_policy(
             batch["tasks"], batch["observations"], batch["embeddings"], x_t, t, rng=policy_rng2, grad_params=params)
 
         snrs = get_snr(t)
         weights = get_weightings("karras", snrs, self.config["sigma_data"])
-
         recon_diffs = (distiller - x_start) ** 2
-        recon_loss = (mean_flat(recon_diffs) * weights).mean()
+        valid_recon_diffs = recon_diffs[split_idx:] 
+        valid_weights = weights[split_idx:]
+        recon_loss = (mean_flat(valid_recon_diffs) * valid_weights).mean()
+        mse_raw = (new_actions - actions) ** 2
+        mse_weighted = mse_raw.at[..., -1].multiply(2.0)
 
-        mse = ((new_actions - actions) ** 2).sum(-1)
+        bc_loss_explicit = mse_weighted[split_idx:].sum(-1).mean()
         q_new_actions = self.forward_critic(
             batch["observations"], batch["embeddings"], new_actions, rng=critic_rng,)
         q_new_actions = q_new_actions.mean(axis=0)
-        chex.assert_shape(q_new_actions, (batch_size,))
 
         q_loss = - q_new_actions.mean()
 
-        actor_loss = self.state.bc_weight * recon_loss + self.state.q_weight * q_loss
+        actor_loss = (
+            self.state.bc_weight * recon_loss + 
+            self.state.q_weight * q_loss + 
+            self.state.bc_weight * bc_loss_explicit
+        )
 
         info = {
             "actor_loss": actor_loss,
             "q_weight": self.state.q_weight,
             "bc_weight": self.state.bc_weight,
             "q_loss": q_new_actions.mean(),
-            "bc_loss": recon_loss,
-            "mse": mse.mean(),
+            "recon_loss": recon_loss,   
+            "bc_loss_explicit": bc_loss_explicit, 
+            "mse_gripper": mse_raw[..., -1].mean()
         }
 
         return actor_loss, info
@@ -561,6 +618,7 @@ class ConrftCPOctoAgentSingleArm(flax.struct.PyTreeNode):
         entropy_per_dim: bool = False,
         cql_temp: float = 1.0,
         cql_action_sample_method: str = "uniform",
+        # here, cql_clip_diff_min must be set as 0 to activate calql, otherwise, cql is used
         cql_clip_diff_min: float = -np.inf,
         cql_clip_diff_max: float = np.inf,
         cql_alpha: float = 0.1,

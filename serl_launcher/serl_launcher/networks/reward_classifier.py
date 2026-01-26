@@ -80,6 +80,7 @@ def create_classifier(
         tx=optax.adam(learning_rate=1e-4),
     )
 
+    print("Loading encoder from:", pretrained_encoder_path)
     with open(pretrained_encoder_path, "rb") as f:
         encoder_params = pkl.load(f)
     param_count = sum(x.size for x in jax.tree.leaves(encoder_params))
