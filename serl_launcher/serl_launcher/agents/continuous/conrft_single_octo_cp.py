@@ -598,6 +598,7 @@ class ConrftCPOctoAgentSingleArm(flax.struct.PyTreeNode):
         # Optimizer
         actor_optimizer_kwargs={
             "learning_rate": 3e-4,
+            "warmup_steps":100,
         },
         critic_optimizer_kwargs={
             "learning_rate": 3e-4,
