@@ -15,21 +15,12 @@ The original installation process is no longer reliable due to severe version co
 conda create -n conrft python=3.10
 conda activate conrft
 conda install -c "nvidia/label/cuda-12.1.0" cuda
-# This is not text error, to run this project, the quickest way to to create a new environment to satisfy jax and torch simutanously
-conda create -n flexiv_conrft python=3.10
-conda activate flexiv_conrft
-conda install -c "nvidia/label/cuda-12.1.0" cuda
 ```
 
 ### 2. PyTorch and JAX (GPU)
 
 ```bash
-pip install torch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 \
-  --index-url https://download.pytorch.org/whl/cu121 \
-  -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-pip install --upgrade "jax[cuda12_local]==0.6.2" \
--f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install --upgrade "jax[cuda12_pip]==0.4.26" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
 Configure runtime libraries (modify the Conda path if needed):
