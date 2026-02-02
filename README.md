@@ -35,8 +35,6 @@ Verify:
 python - << 'EOF'
 import jax
 print(jax.devices())
-import torch
-print(torch.cuda.is_available())
 EOF
 ```
 
