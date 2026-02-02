@@ -202,9 +202,9 @@ class JaxRLTrainState(struct.PyTreeNode):
             Otherwise, returns the new train state.
         """
         # create a pytree of rngs with the same structure as `loss_fns`
-        treedef = jax.tree_util.tree_structure(loss_fns)
+        treedef = jax.tree.util.tree_structure(loss_fns)
         new_rng, *rngs = jax.random.split(self.rng, treedef.num_leaves + 1)
-        rngs = jax.tree_util.tree_unflatten(treedef, rngs)
+        rngs = jax.tree.util.tree_unflatten(treedef, rngs)
 
         # compute gradients
         grads_and_aux = jax.tree.map(
